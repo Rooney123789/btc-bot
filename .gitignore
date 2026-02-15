@@ -35,6 +35,8 @@ env/
 # Project-specific
 btc_bot/*.db
 btc_bot/logs/*.log
+btc_bot/models/*.pkl
+btc_bot/models/*.joblib
 *.db
 
 # OS
