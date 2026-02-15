@@ -23,6 +23,14 @@ POLYMARKET_GAMMA_URL: str = "https://gamma-api.polymarket.com"
 POLYMARKET_CLOB_URL: str = "https://clob.polymarket.com"
 POLYMARKET_BTC_5M_SLUG_PATTERN: str = "btc-updown-5m"
 
+# Risk (used in backtest & execution)
+MAX_TRADE_USD: float = 10.0
+MAX_RISK_PCT: float = 0.10
+EDGE_THRESHOLD: float = 0.06
+CONSECUTIVE_LOSS_STOP: int = 2
+DAILY_DRAWDOWN_CAP_PCT: float = 0.10
+INITIAL_BALANCE: float = 100.0
+
 # Database
 DB_INIT_SQL: str = """
 CREATE TABLE IF NOT EXISTS binance_klines (
