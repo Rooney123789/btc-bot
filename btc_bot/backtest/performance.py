@@ -55,6 +55,7 @@ def print_trade_summary(trades: list[Any], stats: dict[str, Any]) -> None:
     print(f"Wins:           {stats.get('wins', 0)}")
     print(f"Losses:         {stats.get('losses', 0)}")
     print(f"Win Rate:       {stats.get('win_rate', 0):.2%}")
+    print(f"Profit Factor:  {stats.get('profit_factor', 0):.2f}")
     print(f"Total PnL:      ${stats.get('total_pnl', 0):.2f}")
     print(f"Final Balance:  ${stats.get('final_balance', 0):.2f}")
     print(f"Max Drawdown:   {stats.get('max_drawdown', 0):.1%}")

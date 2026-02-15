@@ -30,6 +30,25 @@ def setup_logging() -> None:
     logging.getLogger("aiohttp").setLevel(logging.WARNING)
 
 
+async def cmd_backfill(days: int = 60) -> None:
+    """Backfill historical Binance data (needed for 10k+ rows)."""
+    from datetime import datetime, timezone
+
+    from data.data_collector import collect_binance_klines, init_db
+    from data.database import get_connection
+
+    from data.database import get_connection
+
+    init_db()
+    end_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    start_ms = end_ms - (days * 24 * 60 * 60 * 1000)
+    count = await collect_binance_klines(start_time_ms=start_ms, end_time_ms=end_ms, use_latest=False)
+    with get_connection() as conn:
+        total = conn.execute("SELECT COUNT(*) FROM binance_klines").fetchone()[0]
+    print(f"Backfilled {count} candles. Total in DB: {total}")
+    print(f"PHASE 1 COMPLETE (backfill)")
+
+
 async def cmd_collect() -> None:
     """Phase 1: Data collection."""
     from data.data_collector import collect_all
@@ -52,7 +71,7 @@ def cmd_backtest() -> None:
     from backtest.performance import plot_equity_and_drawdown, print_trade_summary
     from backtest.simulator import run_backtest
 
-    result = run_backtest(limit=3000)
+    result = run_backtest(limit=15000)
     print_trade_summary(result["trades"], result["stats"])
     plot_equity_and_drawdown(result["equity_curve"], result["drawdown_curve"])
     print("PHASE 4 COMPLETE")
@@ -117,12 +136,15 @@ def main() -> None:
         "mode",
         nargs="?",
         default="collect",
-        choices=["collect", "train", "backtest", "paper", "status"],
-        help="Mode: collect|train|backtest|paper|status",
+        choices=["collect", "train", "backtest", "paper", "status", "backfill"],
+        help="Mode: collect|train|backtest|paper|status|backfill",
     )
+    parser.add_argument("--days", type=int, default=60, help="Backfill: days of history")
     args = parser.parse_args()
 
-    if args.mode == "collect":
+    if args.mode == "backfill":
+        asyncio.run(cmd_backfill(args.days))
+    elif args.mode == "collect":
         asyncio.run(cmd_collect())
     elif args.mode == "train":
         cmd_train()

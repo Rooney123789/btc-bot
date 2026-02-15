@@ -2,8 +2,10 @@
 Polymarket client for fetching BTC 5-minute market prices.
 
 Uses Gamma API for discovery and CLOB for live prices.
+Supports HTTP/HTTPS proxy via POLYMARKET_PROXY env var for blocked regions.
 """
 
+import asyncio
 import json
 import logging
 import re
@@ -12,12 +14,41 @@ from typing import Any
 import aiohttp
 
 from config import (
-    POLYMARKET_BTC_5M_SLUG_PATTERN,
     POLYMARKET_CLOB_URL,
     POLYMARKET_GAMMA_URL,
+    POLYMARKET_MAX_RETRIES,
+    POLYMARKET_PROXY,
+    POLYMARKET_TIMEOUT,
 )
 
 logger = logging.getLogger(__name__)
+
+
+async def _request_with_retry(
+    url: str,
+    params: dict[str, str | int] | None = None,
+) -> dict[str, Any] | list[Any]:
+    """GET with retries and optional proxy."""
+    timeout = aiohttp.ClientTimeout(total=POLYMARKET_TIMEOUT, connect=10)
+    last_err: Exception | None = None
+
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        for attempt in range(POLYMARKET_MAX_RETRIES):
+            try:
+                async with session.get(
+                    url,
+                    params=params or {},
+                    proxy=POLYMARKET_PROXY,
+                ) as resp:
+                    resp.raise_for_status()
+                    return await resp.json()
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                last_err = e
+                if attempt < POLYMARKET_MAX_RETRIES - 1:
+                    await asyncio.sleep(2)
+    if last_err:
+        raise last_err
+    raise RuntimeError("Request failed after retries")
 
 
 async def fetch_btc_5m_markets() -> list[dict[str, Any]]:
@@ -34,19 +65,18 @@ async def fetch_btc_5m_markets() -> list[dict[str, Any]]:
         "limit": 200,
     }
     pattern = re.compile(r"btc[-_]?updown[-_]?5m|btc[-_]?5m", re.I)
-    timeout = aiohttp.ClientTimeout(total=30)
 
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        try:
-            async with session.get(url, params=params) as resp:
-                resp.raise_for_status()
-                events = await resp.json()
-        except aiohttp.ClientError as e:
-            logger.error("Polymarket Gamma request failed: %s", e)
-            raise
-        except Exception as e:
-            logger.error("Polymarket Gamma parse error: %s", e)
-            raise
+    try:
+        events = await _request_with_retry(url, params)
+    except aiohttp.ClientError as e:
+        logger.error("Polymarket Gamma request failed: %s", e)
+        raise
+    except Exception as e:
+        logger.error("Polymarket Gamma error: %s", e)
+        raise
+
+    if not isinstance(events, list):
+        events = []
 
     markets: list[dict[str, Any]] = []
     for event in events:
@@ -96,17 +126,13 @@ async def fetch_clob_price(token_id: str, side: str = "buy") -> float | None:
     """Fetch current price for a token from CLOB."""
     url = f"{POLYMARKET_CLOB_URL}/price"
     params = {"token_id": token_id, "side": side}
-    timeout = aiohttp.ClientTimeout(total=15)
 
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        try:
-            async with session.get(url, params=params) as resp:
-                resp.raise_for_status()
-                data = await resp.json()
-                return float(data.get("price", 0))
-        except (aiohttp.ClientError, KeyError, ValueError, TypeError) as e:
-            logger.warning("CLOB price fetch failed for %s: %s", token_id[:20], e)
-            return None
+    try:
+        data = await _request_with_retry(url, params)
+        return float(data.get("price", 0))
+    except (aiohttp.ClientError, KeyError, ValueError, TypeError) as e:
+        logger.warning("CLOB price fetch failed for %s: %s", token_id[:20], e)
+        return None
 
 
 async def fetch_market_prices(market: dict[str, Any]) -> dict[str, Any] | None:

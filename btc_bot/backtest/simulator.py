@@ -179,11 +179,15 @@ def _compute_stats(
             "total_pnl": 0.0,
             "final_balance": initial_balance,
             "max_drawdown": 0.0,
+            "profit_factor": 0.0,
         }
     wins = sum(1 for t in trades if t.outcome == 1)
     total_pnl = sum(t.pnl for t in trades)
     final_balance = equity_curve[-1]
     max_dd = max(drawdown_curve) if drawdown_curve else 0
+    gross_profit = sum(t.pnl for t in trades if t.pnl > 0)
+    gross_loss = abs(sum(t.pnl for t in trades if t.pnl < 0))
+    profit_factor = gross_profit / gross_loss if gross_loss > 0 else (float("inf") if gross_profit > 0 else 0)
     return {
         "total_trades": len(trades),
         "wins": wins,
@@ -192,4 +196,5 @@ def _compute_stats(
         "total_pnl": total_pnl,
         "final_balance": final_balance,
         "max_drawdown": max_dd,
+        "profit_factor": profit_factor,
     }

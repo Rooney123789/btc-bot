@@ -4,6 +4,7 @@ BTC 5-Min ML Trading Bot - Configuration.
 Central config for all modules. No secrets in this file.
 """
 
+import os
 from pathlib import Path
 
 # Paths
@@ -22,6 +23,10 @@ BINANCE_KLINES_LIMIT: int = 1000  # Max per request
 POLYMARKET_GAMMA_URL: str = "https://gamma-api.polymarket.com"
 POLYMARKET_CLOB_URL: str = "https://clob.polymarket.com"
 POLYMARKET_BTC_5M_SLUG_PATTERN: str = "btc-updown-5m"
+# Proxy for regions where Polymarket is blocked. Set env POLYMARKET_PROXY e.g. http://127.0.0.1:7890
+POLYMARKET_PROXY: str | None = os.environ.get("POLYMARKET_PROXY") or None
+POLYMARKET_TIMEOUT: int = 30
+POLYMARKET_MAX_RETRIES: int = 2
 
 # Risk (used in backtest & execution)
 MAX_TRADE_USD: float = 10.0
